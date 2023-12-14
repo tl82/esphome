@@ -2,6 +2,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esp_one_wire.h"
 
 #include <vector>
@@ -10,12 +11,16 @@ namespace esphome {
 namespace dallas {
 
 class DallasTemperatureSensor;
+class iButtonBinarySensor;
 
 class DallasComponent : public PollingComponent {
  public:
   void set_pin(InternalGPIOPin *pin) { pin_ = pin; }
   void register_sensor(DallasTemperatureSensor *sensor);
-
+  
+  void register_ibutton(iButtonBinarySensor *sensor);
+  void read_ibutton_sensors();
+  
   void setup() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::DATA; }
@@ -24,11 +29,15 @@ class DallasComponent : public PollingComponent {
 
  protected:
   friend DallasTemperatureSensor;
+  friend iButtonBinarySensor;
 
   InternalGPIOPin *pin_;
   ESPOneWire *one_wire_;
   std::vector<DallasTemperatureSensor *> sensors_;
   std::vector<uint64_t> found_sensors_;
+
+  std::vector<iButtonBinarySensor *> ibutton_sensors_;
+  std::vector<uint64_t> found_ibuttons_;
 };
 
 /// Internal class that helps us create multiple sensors for one Dallas hub.
@@ -72,6 +81,19 @@ class DallasTemperatureSensor : public sensor::Sensor {
   uint8_t scratch_pad_[9] = {
       0,
   };
+};
+
+class iButtonBinarySensor : public binary_sensor::BinarySensor {
+  public:
+    void set_parent(DallasComponent *parent) { parent_ = parent; }
+    const std::string &get_address_name();
+    void set_address(uint64_t address);
+    bool get_state();
+  protected:
+    DallasComponent *parent_;
+    uint64_t address_;
+    bool state_;
+    std::string address_name_;
 };
 
 }  // namespace dallas
