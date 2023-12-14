@@ -4,7 +4,8 @@ from esphome import pins
 from esphome.const import CONF_ID, CONF_PIN
 
 MULTI_CONF = True
-AUTO_LOAD = ["sensor"]
+#AUTO_LOAD = ["sensor"]
+AUTO_LOAD = ["sensor", "binary_sensor"]
 
 dallas_ns = cg.esphome_ns.namespace("dallas")
 DallasComponent = dallas_ns.class_("DallasComponent", cg.PollingComponent)
