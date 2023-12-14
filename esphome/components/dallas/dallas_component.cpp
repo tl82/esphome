@@ -14,6 +14,7 @@ static const uint8_t DALLAS_MODEL_DS28EA00 = 0x42;
 static const uint8_t DALLAS_COMMAND_START_CONVERSION = 0x44;
 static const uint8_t DALLAS_COMMAND_READ_SCRATCH_PAD = 0xBE;
 static const uint8_t DALLAS_COMMAND_WRITE_SCRATCH_PAD = 0x4E;
+static const uint8_t DALLAS_MODEL_DS1990A = 0x10;
 
 uint16_t DallasTemperatureSensor::millis_to_wait_for_conversion() const {
   switch (this->resolution_) {
@@ -70,7 +71,41 @@ void DallasComponent::setup() {
       this->status_set_error();
     }
   }
+
+  this->read_ibutton_sensors();
+  
 }
+
+void DallasComponent::read_ibutton_sensors() {
+
+  std::vector<uint64_t> raw_sensors;
+  raw_sensors = this->one_wire_->search_vec();
+  this->found_ibuttons_.clear();
+
+  for (auto &address : raw_sensors) {
+    auto *address8 = reinterpret_cast<uint8_t *>(&address);
+    if (crc8(address8, 7) != address8[7]) {
+      ESP_LOGW(TAG, "Dallas device 0x%s has invalid CRC.", format_hex(address).c_str());
+      continue;
+    }
+    if (address8[0] != DALLAS_MODEL_DS1990A) {
+      ESP_LOGW(TAG, "Unknown device type 0x%02X.", address8[0]);
+      continue;
+    }
+    this->found_ibuttons_.push_back(address);
+  }
+
+  if (this->found_ibuttons_.empty()) {
+    ESP_LOGW(TAG, "  Found no iButtons!");
+  } else {
+    ESP_LOGD(TAG, "  Found iButtons:");
+    for (auto &address : this->found_ibuttons_) {
+      ESP_LOGD(TAG, "    0x%s", format_hex(address).c_str());
+    }
+  }
+
+}
+
 void DallasComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "DallasComponent:");
   LOG_PIN("  Pin: ", this->pin_);
@@ -97,9 +132,25 @@ void DallasComponent::dump_config() {
     ESP_LOGCONFIG(TAG, "    Address: %s", sensor->get_address_name().c_str());
     ESP_LOGCONFIG(TAG, "    Resolution: %u", sensor->get_resolution());
   }
+
+  //if (this->found_ibuttons_.empty()) {
+  //  ESP_LOGW(TAG, "  Found no iButtons!");
+  //} else {
+  //  ESP_LOGD(TAG, "  Found iButtons:");
+  //  for (auto &address : this->found_ibuttons_) {
+  //    ESP_LOGD(TAG, "    0x%s", format_hex(address).c_str());
+  //  }
+  //}
+    
+  for (auto *sensor : this->ibutton_sensors_) {
+    LOG_BINARY_SENSOR("  ", "Device", sensor);
+    ESP_LOGCONFIG(TAG, "    Address: %s", sensor->get_address_name().c_str());
+  }
+  
 }
 
 void DallasComponent::register_sensor(DallasTemperatureSensor *sensor) { this->sensors_.push_back(sensor); }
+
 void DallasComponent::update() {
   this->status_clear_warning();
 
@@ -144,6 +195,15 @@ void DallasComponent::update() {
       sensor->publish_state(tempc);
     });
   }
+
+  this->read_ibutton_sensors();
+
+  for (auto *ibutton_sensor : this->ibutton_sensors_) {
+    bool state = ibutton_sensor->get_state();
+    ESP_LOGD(TAG, "'%s': State=%s", ibutton_sensor->get_name().c_str(), state);
+    ibutton_sensor->publish_state(state);
+  }
+  
 }
 
 void DallasTemperatureSensor::set_address(uint64_t address) { this->address_ = address; }
@@ -274,6 +334,28 @@ float DallasTemperatureSensor::get_temp_c() {
   return temp / 128.0f;
 }
 std::string DallasTemperatureSensor::unique_id() { return "dallas-" + str_lower_case(format_hex(this->address_)); }
+
+void DallasComponent::register_ibutton(iButtonBinarySensor *sensor) { this->ibutton_sensors_.push_back(sensor); }
+
+void iButtonBinarySensor::set_address(uint64_t address) { this->address_ = address; }
+
+const std::string &iButtonBinarySensor::get_address_name() {
+    if (this->address_name_.empty()) {
+        this->address_name_ = std::string("0x") + format_hex(this->address_);
+    }
+    return this->address_name_;
+}
+
+bool iButtonBinarySensor::get_state() {
+  this->state_ = false;
+  for (auto &address : this->parent_->found_ibuttons_) {
+    if ((std::string("0x") + format_hex(address)) == this->get_address_name()) {
+      this->state_ = true;
+      break;
+    }
+  }
+  return this->state_;
+}
 
 }  // namespace dallas
 }  // namespace esphome
