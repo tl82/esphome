@@ -49,6 +49,8 @@ spi:
     number: GPIO14
 
 ota:
+  - platform: esphome
+    version: 2
 
 logger:
 
@@ -243,13 +245,6 @@ sensor:
       name: "ADE7953 Reactive Power B"
     update_interval: 1s
 
-  - platform: ens160
-    eco2:
-      name: "ENS160 eCO2"
-    tvoc:
-      name: "ENS160 Total Volatile Organic Compounds"
-    aqi:
-      name: "ENS160 Air Quality Index"
   - platform: tmp102
     name: TMP102 Temperature
   - platform: hm3301
@@ -288,6 +283,62 @@ sensor:
   - platform: adc128s102
     id: adc128s102_channel_0
     channel: 0
+
+  - platform: ade7880
+    irq0_pin:
+      number: GPIO13
+      allow_other_uses: true
+    irq1_pin:
+      number: GPIO5
+      allow_other_uses: true
+    reset_pin:
+      number: GPIO16
+      allow_other_uses: true
+    frequency: 60Hz
+    phase_a:
+      name: Channel A
+      voltage: Voltage
+      current: Current
+      active_power: Active Power
+      power_factor: Power Factor
+      forward_active_energy: Forward Active Energy
+      reverse_active_energy: Reverse Active Energy
+      calibration:
+        current_gain: 3116628
+        voltage_gain: -757178
+        power_gain: -1344457
+        phase_angle: 188
+    phase_b:
+      name: Channel B
+      voltage: Voltage
+      current: Current
+      active_power: Active Power
+      power_factor: Power Factor
+      forward_active_energy: Forward Active Energy
+      reverse_active_energy: Reverse Active Energy
+      calibration:
+        current_gain: 3133655
+        voltage_gain: -755235
+        power_gain: -1345638
+        phase_angle: 188
+    phase_c:
+      name: Channel C
+      voltage: Voltage
+      current: Current
+      active_power: Active Power
+      power_factor: Power Factor
+      forward_active_energy: Forward Active Energy
+      reverse_active_energy: Reverse Active Energy
+      calibration:
+        current_gain: 3111158
+        voltage_gain: -743813
+        power_gain: -1351437
+        phase_angle: 180
+    neutral:
+      name: Neutral
+      current: Current
+      calibration:
+        current_gain: 3189
 
 apds9960:
   address: 0x20
@@ -401,7 +452,6 @@ switch:
     pin:
       mcp23xxx: mcp23017_hub
       number: 0
-      allow_other_uses: true
       mode: OUTPUT
     interlock: &interlock [gpio_switch1, gpio_switch2, gpio_switch3]
   - platform: gpio
@@ -409,7 +459,6 @@ switch:
     pin:
       mcp23xxx: mcp23008_hub
       number: 0
-      allow_other_uses: true
       mode: OUTPUT
     interlock: *interlock
   - platform: gpio
@@ -448,7 +497,7 @@ switch:
   - platform: template
     name: open_vent
     id: open_vent
-    optimistic: True
+    optimistic: true
     on_turn_on:
       then:
         - grove_tb6612fng.run:
